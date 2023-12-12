@@ -1,3 +1,4 @@
+#include <limits>
 #include "common.h"
 #include "formula.h"
 #include "test_runner_p.h"
@@ -24,9 +25,6 @@ inline std::ostream& operator<<(std::ostream& output, const CellInterface::Value
 }
 
 namespace {
-std::string ToString(FormulaError::Category category) {
-    return std::string(FormulaError(category).ToString());
-}
 
 void TestPositionAndStringConversion() {
     auto testSingle = [](Position pos, std::string_view str) {
@@ -155,6 +153,8 @@ void TestFormulaReferences() {
     };
 
     sheet->SetCell("A1"_pos, "1");
+    // auto a = evaluate("A1");
+    // std::cout <<a;
     ASSERT_EQUAL(evaluate("A1"), 1);
     sheet->SetCell("A2"_pos, "2");
     ASSERT_EQUAL(evaluate("A1+A2"), 3);
@@ -197,6 +197,7 @@ void TestErrorValue() {
     auto sheet = CreateSheet();
     sheet->SetCell("E2"_pos, "A1");
     sheet->SetCell("E4"_pos, "=E2");
+    auto a = sheet->GetCell("E4"_pos)->GetValue();
     ASSERT_EQUAL(sheet->GetCell("E4"_pos)->GetValue(),
                  CellInterface::Value(FormulaError::Category::Value));
 
@@ -226,6 +227,7 @@ void TestErrorDiv0() {
         std::ostringstream formula;
         formula << '=' << max << '+' << max;
         sheet->SetCell("A1"_pos, formula.str());
+        auto a = sheet->GetCell("A1"_pos)->GetValue();
         ASSERT_EQUAL(sheet->GetCell("A1"_pos)->GetValue(),
                      CellInterface::Value(FormulaError::Category::Div0));
     }
@@ -250,7 +252,8 @@ void TestErrorDiv0() {
 void TestEmptyCellTreatedAsZero() {
     auto sheet = CreateSheet();
     sheet->SetCell("A1"_pos, "=B2");
-    ASSERT_EQUAL(sheet->GetCell("A1"_pos)->GetValue(), CellInterface::Value(0));
+    auto a = sheet->GetCell("A1"_pos)->GetValue();
+    ASSERT_EQUAL(sheet->GetCell("A1"_pos)->GetValue(), CellInterface::Value(0.0));
 }
 
 void TestFormulaInvalidPosition() {
@@ -350,6 +353,8 @@ void TestCellCircularReferences() {
 }  // namespace
 
 int main() {
+    using namespace std::literals;
+
     TestRunner tr;
     RUN_TEST(tr, TestPositionAndStringConversion);
     RUN_TEST(tr, TestPositionToStringInvalid);
@@ -365,9 +370,12 @@ int main() {
     RUN_TEST(tr, TestErrorValue);
     RUN_TEST(tr, TestErrorDiv0);
     RUN_TEST(tr, TestEmptyCellTreatedAsZero);
+
     RUN_TEST(tr, TestFormulaInvalidPosition);
     RUN_TEST(tr, TestPrint);
     RUN_TEST(tr, TestCellReferences);
     RUN_TEST(tr, TestFormulaIncorrect);
     RUN_TEST(tr, TestCellCircularReferences);
+
+    return 0;
 }

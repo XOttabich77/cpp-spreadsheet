@@ -2,35 +2,109 @@
 
 #include "common.h"
 #include "formula.h"
+#include <memory>
+#include <optional>
 
-#include <functional>
-#include <unordered_set>
+template <>
+struct std::hash<Position>
+{
+    std::size_t operator()(const Position& position) const noexcept
+    {
+        return (position.row < 12) + position.col;
+    }
+};
 
-class Sheet;
+using Value = CellInterface::Value;
+
+class Impl {
+public:
+    virtual ~Impl() = default;
+    virtual void Set(std::string text) = 0;
+    virtual Value GetValue() const = 0;
+    virtual std::string GetText() const = 0;
+    virtual void Clear() = 0;
+    virtual std::vector<Position> GetReferencedCells() const = 0;
+};
+
+class TextImpl : public Impl {
+public:
+    TextImpl() = default;
+    ~TextImpl() = default;
+
+    explicit TextImpl(std::string value) :
+        value_(std::move(value)){
+    }
+    void Set(std::string text) override{
+        value_ = std::move(text);
+    }
+    Value GetValue()const override{
+        if(value_[0] == '\''){
+            return value_.substr(1);
+        }
+        return value_;
+    }
+    std::string GetText() const override{
+        return value_;
+    }
+    void Clear() override{
+        value_.clear();
+    }
+    std::vector<Position> GetReferencedCells() const override{
+        return {};
+    }
+
+private:
+    std::string value_;
+};
+
+class FormulaImpl : public Impl{
+public:
+    FormulaImpl(const SheetInterface& sheet) :
+        sheet_(sheet)
+        {};
+    ~FormulaImpl() = default;
+    explicit FormulaImpl(std::string value, const SheetInterface& sheet) :
+        sheet_(sheet){
+        formula_ = ParseFormula(value);
+    }
+    void Set(std::string text) override{
+        formula_ = ParseFormula(text);
+    }
+    Value GetValue()const override{
+        auto result = formula_->Evaluate(sheet_);
+        if(std::holds_alternative<double>(result)){
+            return std::get<double>(result);
+        }
+        return std::get<FormulaError>(result);
+    }
+    std::string GetText() const override{
+        return '=' + formula_->GetExpression();
+    }
+    void Clear() override{
+        formula_.reset();
+    }
+    std::vector<Position> GetReferencedCells() const override {
+        return formula_->GetReferencedCells();
+    }
+private:
+    std::unique_ptr<FormulaInterface> formula_;
+    const SheetInterface& sheet_;
+};
 
 class Cell : public CellInterface {
 public:
-    Cell(Sheet& sheet);
-    ~Cell();
-
-    void Set(std::string text);
+    friend class Sheet;
+    Cell();
+    ~Cell() = default;
+    void Set(std::string text, SheetInterface& sheet);
     void Clear();
-
     Value GetValue() const override;
     std::string GetText() const override;
     std::vector<Position> GetReferencedCells() const override;
-
-    bool IsReferenced() const;
+    std::vector<Position> GetUpDependencesCells() const;
 
 private:
-    class Impl;
-    class EmptyImpl;
-    class TextImpl;
-    class FormulaImpl;
-
     std::unique_ptr<Impl> impl_;
-
-    // Добавьте поля и методы для связи с таблицей, проверки циклических 
-    // зависимостей, графа зависимостей и т. д.
-
+    mutable std::optional<double> cashvalue_;
+    std::unordered_set<Position> cell_depend_up_;
 };

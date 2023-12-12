@@ -65,14 +65,14 @@ constexpr PrecedenceRule PRECEDENCE_RULES[EP_END][EP_END] = {
     /* EP_DIV */ {PR_BOTH, PR_BOTH, PR_RIGHT, PR_RIGHT, PR_NONE, PR_NONE},
     /* EP_UNARY */ {PR_BOTH, PR_BOTH, PR_NONE, PR_NONE, PR_NONE, PR_NONE},
     /* EP_ATOM */ {PR_NONE, PR_NONE, PR_NONE, PR_NONE, PR_NONE, PR_NONE},
-};
+    };
 
 class Expr {
 public:
     virtual ~Expr() = default;
     virtual void Print(std::ostream& out) const = 0;
     virtual void DoPrintFormula(std::ostream& out, ExprPrecedence precedence) const = 0;
-    virtual double Evaluate(/*добавьте сюда нужные аргументы*/ args) const = 0;
+    virtual double Evaluate(std::function<CellInterface*(Position)> fcell) const = 0;
 
     // higher is tighter
     virtual ExprPrecedence GetPrecedence() const = 0;
@@ -127,23 +127,48 @@ public:
 
     ExprPrecedence GetPrecedence() const override {
         switch (type_) {
-            case Add:
-                return EP_ADD;
-            case Subtract:
-                return EP_SUB;
-            case Multiply:
-                return EP_MUL;
-            case Divide:
-                return EP_DIV;
-            default:
-                // have to do this because VC++ has a buggy warning
-                assert(false);
-                return static_cast<ExprPrecedence>(INT_MAX);
+        case Add:
+            return EP_ADD;
+        case Subtract:
+            return EP_SUB;
+        case Multiply:
+            return EP_MUL;
+        case Divide:
+            return EP_DIV;
+        default:
+            // have to do this because VC++ has a buggy warning
+            assert(false);
+            return static_cast<ExprPrecedence>(INT_MAX);
         }
     }
 
-    double Evaluate(/*добавьте нужные аргументы*/) const override {
-			// Скопируйте ваше решение из предыдущих уроков.
+    double Evaluate(CellPtr fcell) const override {
+        // Скопируйте ваше решение из предыдущих уроков.
+        double lhs = lhs_.get()->Evaluate(fcell);
+        double rhs = rhs_.get()->Evaluate(fcell);
+        double rs = 0.0;
+        switch (type_) {
+        case Add:
+            if(!std::isfinite(rs = lhs + rhs)){
+                throw FormulaError(FormulaError::Category::Div0);
+            }
+            break;
+        case Subtract:
+            if(!std::isfinite(rs = lhs - rhs)){
+                throw FormulaError(FormulaError::Category::Div0);
+            }
+            break;
+        case Multiply:
+            if(!std::isfinite(rs = lhs * rhs)){
+                throw FormulaError(FormulaError::Category::Div0);
+            }
+            break;
+        case Divide:
+            if(!std::isfinite(rs = lhs / rhs)){
+                throw FormulaError(FormulaError::Category::Div0);
+            }
+        }
+        return rs;
     }
 
 private:
@@ -180,8 +205,12 @@ public:
         return EP_UNARY;
     }
 
-    double Evaluate(/*добавьте нужные аргументы*/ args) const override {
+    double Evaluate(CellPtr fcell) const override {
         // Скопируйте ваше решение из предыдущих уроков.
+        if (type_ == UnaryMinus){
+            return -(operand_.get()->Evaluate(fcell));
+        }
+        return  operand_.get()->Evaluate(fcell);
     }
 
 private:
@@ -211,8 +240,37 @@ public:
         return EP_ATOM;
     }
 
-    double Evaluate(/*добавьте нужные аргументы*/ args) const override {
+    double Evaluate(CellPtr fcell) const override {
         // реализуйте метод.
+        if(!cell_->IsValid()){
+            throw FormulaError(FormulaError::Category::Ref);
+
+        }
+        auto cellptr = fcell(*cell_);
+        if(cellptr == nullptr){
+            return 0;
+        }
+        auto cellvalue = cellptr->GetValue();
+        if(std::holds_alternative<FormulaError>(cellvalue)){
+            throw std::get<FormulaError>(cellvalue);
+        }
+        if(std::holds_alternative<std::string>(cellvalue)){
+            std::string celltext = std::get<std::string>(cellvalue);
+            double rs;
+            try{
+                size_t countchar = 0;
+                celltext.size() == 0 ? rs = 0 : rs = std::stod(celltext,&countchar);
+                if(countchar!=celltext.size()){
+                    throw FormulaError(FormulaError::Category::Value);
+                }
+            } catch(...){
+                throw FormulaError(FormulaError::Category::Value);
+            }
+            return rs;
+        }
+        else {
+            return std::get<double>(cellvalue);
+        }
     }
 
 private:
@@ -237,7 +295,7 @@ public:
         return EP_ATOM;
     }
 
-    double Evaluate(/*добавьте нужные аргументы*/ args) const override {
+    double Evaluate(CellPtr fcell) const override {
         return value_;
     }
 
@@ -391,8 +449,8 @@ void FormulaAST::PrintFormula(std::ostream& out) const {
     root_expr_->PrintFormula(out, ASTImpl::EP_ATOM);
 }
 
-double FormulaAST::Execute(/*добавьте нужные аргументы*/ args) const {
-    return root_expr_->Evaluate(/*добавьте нужные аргументы*/ args);
+double FormulaAST::Execute(CellPtr fcell) const {
+    return root_expr_->Evaluate(fcell);
 }
 
 FormulaAST::FormulaAST(std::unique_ptr<ASTImpl::Expr> root_expr, std::forward_list<Position> cells)
