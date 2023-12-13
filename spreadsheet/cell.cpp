@@ -5,11 +5,7 @@
 #include <string>
 #include <optional>
 
-
-// Реализуйте следующие методы
-Cell::Cell() : impl_(nullptr){}
-
-#define FORMULA_SIGN '='
+Cell::Cell() : impl_(std::make_unique<EmptyImpl>()){}
 
 void Cell::Set(std::string text,SheetInterface& sheet) {
     if(text.size() > 1 && text[0] == FORMULA_SIGN){
@@ -22,30 +18,24 @@ void Cell::Set(std::string text,SheetInterface& sheet) {
 
 void Cell::Clear() {
     impl_.reset();
-    impl_ = nullptr;
+    impl_ = std::make_unique<EmptyImpl>();
 }
 
 Cell::Value Cell::GetValue() const {
     if (cashvalue_){
         return cashvalue_.value();
     }
-    else{
-        if(impl_ == nullptr){
-            return 0.0;
-        }
+    else{     
         Value rs = impl_->GetValue();
         if (std::holds_alternative<double>(rs))
             cashvalue_ = std::get<double>(rs);
         return rs;
     }
 }
-std::string Cell::GetText() const {
+std::string Cell::GetText() const {  
     return impl_->GetText();
 }
 std::vector<Position> Cell::GetReferencedCells() const{
-    if(impl_==nullptr){
-        return std::vector<Position>();
-    }
     return impl_->GetReferencedCells();
 }
 std::vector<Position> Cell::GetUpDependencesCells() const{

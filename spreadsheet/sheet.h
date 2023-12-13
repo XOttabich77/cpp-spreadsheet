@@ -25,15 +25,16 @@ private:
     Size table_size_;
 
     Size SetTableSize(const Position&);
-    void ClearDep(const Position&) ;
+    void ClearDependences(const Position&) ;
     void InsertEmpty(const Position&);
-    void RestoreDep(const Position&);
+    void RestoreDependences(const Position&);
     void ResetCache(const Position&);
-    bool CircularDep(const Position&);
+    bool CheckCircularDependences(const Position&);
 
+    void IsValidPos(const Position& , const std::string&) const;
     int GetRows(const Position&);
     int GetCol(const Position& ,int);
-    bool Circular(const Position& check_pos, const Position& start_pos,
+    bool CheckCircular(const Position& check_pos, const Position& start_pos,
                   std::unordered_set<Position>& cell);
 
 };

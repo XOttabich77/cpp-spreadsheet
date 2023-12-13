@@ -26,7 +26,30 @@ public:
     virtual std::vector<Position> GetReferencedCells() const = 0;
 };
 
-class TextImpl : public Impl {
+class EmptyImpl : public Impl {
+public:
+    EmptyImpl() = default;
+    virtual ~EmptyImpl() = default;
+
+    virtual void Set(std::string text) override
+    {}
+
+    virtual void Clear() override
+    {}
+
+    virtual Value GetValue() const override{
+        return 0.0;
+    }
+
+    virtual std::string GetText() const override{
+        return {};
+    }
+
+    virtual std::vector<Position> GetReferencedCells() const override    {
+        return {};
+    }
+};
+class TextImpl : public Impl{
 public:
     TextImpl() = default;
     ~TextImpl() = default;
@@ -62,14 +85,18 @@ public:
     FormulaImpl(const SheetInterface& sheet) :
         sheet_(sheet)
         {};
+
     ~FormulaImpl() = default;
+
     explicit FormulaImpl(std::string value, const SheetInterface& sheet) :
         sheet_(sheet){
         formula_ = ParseFormula(value);
     }
+
     void Set(std::string text) override{
         formula_ = ParseFormula(text);
     }
+
     Value GetValue()const override{
         auto result = formula_->Evaluate(sheet_);
         if(std::holds_alternative<double>(result)){
@@ -77,15 +104,19 @@ public:
         }
         return std::get<FormulaError>(result);
     }
+
     std::string GetText() const override{
-        return '=' + formula_->GetExpression();
+        return FORMULA_SIGN + formula_->GetExpression();
     }
+
     void Clear() override{
         formula_.reset();
     }
+
     std::vector<Position> GetReferencedCells() const override {
         return formula_->GetReferencedCells();
     }
+
 private:
     std::unique_ptr<FormulaInterface> formula_;
     const SheetInterface& sheet_;

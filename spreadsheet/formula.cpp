@@ -21,6 +21,7 @@ public:
     catch (const std::exception& re){
         throw FormulaException(re.what());
     }
+
     Value Evaluate(const SheetInterface& sheet) const override {
         try{
             auto a = [&sheet](const Position& pos)->CellInterface*{
@@ -33,6 +34,7 @@ public:
             return err;
         }
     }
+
     std::string GetExpression() const override {
         try{
             std::ostringstream str;
@@ -43,16 +45,18 @@ public:
             throw FormulaException("");
         }
     }
+
     std::vector<Position> GetReferencedCells() const override {
         const std::forward_list<Position> formulacells(ast_.GetCells());
         if (formulacells.empty()){
-            return std::vector<Position>();
+            return {};
         }
         else{
             std::vector<Position> rs{ formulacells.begin(), formulacells.end() };
             return { rs.begin(), std::unique(rs.begin(), rs.end()) };
         }
     }
+
 private:
     FormulaAST ast_;
 };
